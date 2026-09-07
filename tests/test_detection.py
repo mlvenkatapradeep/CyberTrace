@@ -164,10 +164,10 @@ def test_multiple_failures_from_same_ip():
 
     events = [
         make_event(base_time),
-        make_event(base_time + timedelta(seconds=10)),
-        make_event(base_time + timedelta(seconds=20)),
         make_event(base_time + timedelta(seconds=30)),
-        make_event(base_time + timedelta(seconds=40)),
+        make_event(base_time + timedelta(minutes=1)),
+        make_event(base_time + timedelta(minutes=2)),
+        make_event(base_time + timedelta(minutes=3)),
     ]
 
     detections = detect_ssh_bruteforce(
@@ -177,3 +177,24 @@ def test_multiple_failures_from_same_ip():
     )
 
     assert len(detections) == 1
+
+
+def test_repeated_failures_within_window_create_one_detection():
+    base_time = datetime(2026, 9, 7, 10, 0, tzinfo=timezone.utc)
+
+    events = [
+        make_event(base_time),
+        make_event(base_time + timedelta(minutes=1)),
+        make_event(base_time + timedelta(minutes=2)),
+        make_event(base_time + timedelta(minutes=3)),
+        make_event(base_time + timedelta(minutes=4)),
+    ]
+
+    detections = detect_ssh_bruteforce(
+        events,
+        threshold=3,
+        window_minutes=5,
+    )
+
+    assert len(detections) == 1
+    assert detections[0].timestamp == base_time + timedelta(minutes=2)
