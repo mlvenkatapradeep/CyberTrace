@@ -1,5 +1,8 @@
 import json
 
+import pytest
+
+from cybertrace.cli import create_parser
 from main import run_pipeline
 
 
@@ -148,3 +151,81 @@ reporting:
     report_path = tmp_path / "reports" / "test_report.json"
 
     assert not report_path.exists()
+
+
+def test_main_returns_error_on_collection_failure(
+    monkeypatch,
+    capsys,
+):
+    from cybertrace.collector.journal import JournalCollectionError
+    from main import main
+
+    def fail_collection(limit):
+        raise JournalCollectionError(
+            "journalctl command was not found."
+        )
+
+    monkeypatch.setattr(
+        "main.collect_ssh_events",
+        fail_collection,
+    )
+
+    monkeypatch.setattr(
+        "sys.argv",
+        ["cybertrace"],
+    )
+
+    result = main()
+
+    captured = capsys.readouterr()
+
+    assert result == 1
+    assert "=== COLLECTION ERROR ===" in captured.out
+    assert "journalctl command was not found." in captured.out
+
+
+def test_cli_default_arguments():
+    parser = create_parser()
+
+    args = parser.parse_args([])
+
+    assert args.config == "config/cybertrace.yaml"
+    assert args.limit == 50
+    assert args.no_json is False
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["0", "-1", "-50", "abc"],
+)
+def test_cli_rejects_invalid_limit(value):
+    parser = create_parser()
+
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--limit", value])
+
+
+def test_cli_accepts_valid_limit():
+    parser = create_parser()
+
+    args = parser.parse_args(["--limit", "100"])
+
+    assert args.limit == 100
+
+
+def test_cli_accepts_config_and_no_json():
+    parser = create_parser()
+
+    args = parser.parse_args(
+        [
+            "--config",
+            "/tmp/test-config.yaml",
+            "--limit",
+            "25",
+            "--no-json",
+        ]
+    )
+
+    assert args.config == "/tmp/test-config.yaml"
+    assert args.limit == 25
+    assert args.no_json is True
