@@ -1,0 +1,9 @@
+ssh:
+  brute_force:
+    threshold: 3
+    window_minutes: 5
+
+reporting:
+  json:
+    enabled: true
+    output: reports/cybertrace_report.json
