@@ -261,3 +261,169 @@ def test_separate_attack_sequences_after_cooldown_create_two_detections():
     assert len(detections) == 2
     assert detections[0].event_id == "ssh-3"
     assert detections[1].event_id == "ssh-6"
+
+
+def test_different_usernames_from_same_ip_are_combined():
+    base_time = datetime(2026, 9, 7, 10, 0, tzinfo=timezone.utc)
+
+    events = [
+        make_event(
+            base_time,
+            event_id="ssh-1",
+            username="admin",
+        ),
+        make_event(
+            base_time + timedelta(minutes=1),
+            event_id="ssh-2",
+            username="root",
+        ),
+        make_event(
+            base_time + timedelta(minutes=2),
+            event_id="ssh-3",
+            username="testuser",
+        ),
+    ]
+
+    detections = detect_ssh_bruteforce(
+        events,
+        threshold=3,
+        window_minutes=5,
+    )
+
+    assert len(detections) == 1
+    assert detections[0].event_id == "ssh-3"
+
+
+def test_invalid_user_and_failed_password_are_combined():
+    base_time = datetime(2026, 9, 7, 10, 0, tzinfo=timezone.utc)
+
+    events = [
+        make_event(
+            base_time,
+            event_id="ssh-1",
+            event_type="ssh_invalid_user",
+            username="attacker",
+        ),
+        make_event(
+            base_time + timedelta(minutes=1),
+            event_id="ssh-2",
+            event_type="ssh_failed_password",
+            username="attacker",
+        ),
+        make_event(
+            base_time + timedelta(minutes=2),
+            event_id="ssh-3",
+            event_type="ssh_invalid_user",
+            username="attacker",
+        ),
+    ]
+
+    detections = detect_ssh_bruteforce(
+        events,
+        threshold=3,
+        window_minutes=5,
+    )
+
+    assert len(detections) == 1
+    assert detections[0].event_id == "ssh-3"
+
+
+def test_events_out_of_order_are_detected_correctly():
+    base_time = datetime(2026, 9, 7, 10, 0, tzinfo=timezone.utc)
+
+    events = [
+        make_event(
+            base_time + timedelta(minutes=2),
+            event_id="ssh-3",
+        ),
+        make_event(
+            base_time,
+            event_id="ssh-1",
+        ),
+        make_event(
+            base_time + timedelta(minutes=1),
+            event_id="ssh-2",
+        ),
+    ]
+
+    detections = detect_ssh_bruteforce(
+        events,
+        threshold=3,
+        window_minutes=5,
+    )
+
+    assert len(detections) == 1
+    assert detections[0].event_id == "ssh-3"
+
+
+def test_multiple_source_ips_create_independent_detections():
+    base_time = datetime(2026, 9, 7, 10, 0, tzinfo=timezone.utc)
+
+    events = [
+        make_event(
+            base_time,
+            event_id="ip1-1",
+            source_ip="192.168.1.10",
+        ),
+        make_event(
+            base_time + timedelta(minutes=1),
+            event_id="ip1-2",
+            source_ip="192.168.1.10",
+        ),
+        make_event(
+            base_time + timedelta(minutes=2),
+            event_id="ip1-3",
+            source_ip="192.168.1.10",
+        ),
+        make_event(
+            base_time,
+            event_id="ip2-1",
+            source_ip="192.168.1.20",
+        ),
+        make_event(
+            base_time + timedelta(minutes=1),
+            event_id="ip2-2",
+            source_ip="192.168.1.20",
+        ),
+        make_event(
+            base_time + timedelta(minutes=2),
+            event_id="ip2-3",
+            source_ip="192.168.1.20",
+        ),
+    ]
+
+    detections = detect_ssh_bruteforce(
+        events,
+        threshold=3,
+        window_minutes=5,
+    )
+
+    assert len(detections) == 2
+
+    detection_ids = {
+        detection.event_id
+        for detection in detections
+    }
+
+    assert detection_ids == {"ip1-3", "ip2-3"}
+
+
+def test_long_attack_sequence_creates_only_one_detection():
+    base_time = datetime(2026, 9, 7, 10, 0, tzinfo=timezone.utc)
+
+    events = [
+        make_event(
+            base_time + timedelta(seconds=index * 30),
+            event_id=f"ssh-{index}",
+        )
+        for index in range(10)
+    ]
+
+    detections = detect_ssh_bruteforce(
+        events,
+        threshold=3,
+        window_minutes=5,
+    )
+
+    assert len(detections) == 1
+    assert detections[0].event_id == "ssh-2"
