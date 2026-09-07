@@ -110,18 +110,26 @@ def run_pipeline(
     return incidents
 
 
-def main() -> None:
+def main() -> int:
     """Run CyberTrace from the command line."""
 
     parser = create_parser()
     args = parser.parse_args()
 
-    run_pipeline(
-        config_path=args.config,
-        limit=args.limit,
-        no_json=args.no_json,
-    )
+    try:
+        run_pipeline(
+            config_path=args.config,
+            limit=args.limit,
+            no_json=args.no_json,
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        print()
+        print("=== CONFIGURATION ERROR ===")
+        print(str(exc))
+        return 1
+
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
