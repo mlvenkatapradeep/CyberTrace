@@ -117,7 +117,7 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
-        run_pipeline(
+        incidents = run_pipeline(
             config_path=args.config,
             limit=args.limit,
             no_json=args.no_json,
@@ -126,6 +126,9 @@ def main() -> int:
         print()
         print("=== CONFIGURATION ERROR ===")
         print(str(exc))
+        return 1
+
+    if incidents == []:
         return 1
 
     return 0
