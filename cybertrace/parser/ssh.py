@@ -6,7 +6,8 @@ from cybertrace.event import AuthenticationEvent
 
 def parse_ssh_record(record: dict) -> AuthenticationEvent | None:
     """Parse one raw journald SSH record into an AuthenticationEvent."""
-    message = record.get("MESSAGE", "")
+
+    message = record.get("MESSAGE", record.get("message", ""))
 
     if not message:
         return None
@@ -51,21 +52,42 @@ def parse_ssh_record(record: dict) -> AuthenticationEvent | None:
     source_ip = match.group("source_ip")
     source_port = int(match.group("source_port"))
 
+    # Real systemd-journald records use __REALTIME_TIMESTAMP.
     timestamp_us = record.get("__REALTIME_TIMESTAMP")
 
-    if not timestamp_us:
-        return None
+    if timestamp_us:
+        try:
+            timestamp = datetime.fromtimestamp(
+                int(timestamp_us) / 1_000_000,
+                tz=timezone.utc,
+            )
+        except (TypeError, ValueError, OverflowError):
+            return None
 
-    try:
-        timestamp = datetime.fromtimestamp(
-            int(timestamp_us) / 1_000_000,
-            tz=timezone.utc,
-        )
-    except (TypeError, ValueError, OverflowError):
-        return None
+        event_id = f"ssh-{timestamp_us}"
+
+    else:
+        # Test fixtures and other structured inputs may provide
+        # an ISO-8601 timestamp directly.
+        timestamp_value = record.get("timestamp")
+
+        if not timestamp_value:
+            return None
+
+        try:
+            timestamp = datetime.fromisoformat(
+                timestamp_value.replace("Z", "+00:00")
+            )
+        except (TypeError, ValueError):
+            return None
+
+        if timestamp.tzinfo is None:
+            timestamp = timestamp.replace(tzinfo=timezone.utc)
+
+        event_id = f"ssh-{timestamp.isoformat()}"
 
     return AuthenticationEvent(
-        event_id=f"ssh-{timestamp_us}",
+        event_id=event_id,
         timestamp=timestamp,
         event_type=event_type,
         username=username,

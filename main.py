@@ -1,25 +1,26 @@
 from cybertrace.cli import create_parser
 from cybertrace.collector.journal import collect_ssh_events
-from cybertrace.parser.ssh import parse_ssh_record
+from cybertrace.config.loader import load_config
 from cybertrace.detection.ssh import detect_ssh_bruteforce
 from cybertrace.incident.generator import generate_ssh_incidents
+from cybertrace.parser.ssh import parse_ssh_record
 from cybertrace.reporting.report import (
     generate_report,
     save_json_report,
 )
-from cybertrace.config.loader import load_config
 
 
-def main() -> None:
-    """Run the complete CyberTrace detection and reporting pipeline."""
-
-    parser = create_parser()
-    args = parser.parse_args()
+def run_pipeline(
+    config_path: str = "config/cybertrace.yaml",
+    limit: int = 50,
+    no_json: bool = False,
+):
+    """Run the CyberTrace detection and reporting pipeline."""
 
     print("=== CYBERTRACE PIPELINE ===")
 
-    # 1. Load CyberTrace configuration
-    config = load_config(args.config)
+    # 1. Load configuration
+    config = load_config(config_path)
 
     ssh_config = config.get("ssh", {}).get("brute_force", {})
 
@@ -30,7 +31,7 @@ def main() -> None:
 
     json_enabled = (
         json_config.get("enabled", True)
-        and not args.no_json
+        and not no_json
     )
 
     json_output = json_config.get(
@@ -38,18 +39,18 @@ def main() -> None:
         "reports/cybertrace_report.json",
     )
 
-    # 2. Display active security configuration
+    # 2. Display active configuration
     print()
     print("=== ACTIVE CONFIGURATION ===")
     print(f"SSH brute-force threshold : {threshold}")
     print(f"SSH detection window      : {window_minutes} minutes")
-    print(f"Event collection limit    : {args.limit}")
+    print(f"Event collection limit    : {limit}")
     print(f"JSON reporting enabled    : {json_enabled}")
     print(f"JSON report output        : {json_output}")
     print()
 
     # 3. Collect raw SSH journal records
-    records = collect_ssh_events(args.limit)
+    records = collect_ssh_events(limit)
 
     # 4. Parse raw records into AuthenticationEvent objects
     events = [
@@ -96,6 +97,21 @@ def main() -> None:
         print()
         print("JSON report saved to:")
         print(json_output)
+
+    return incidents
+
+
+def main() -> None:
+    """Run CyberTrace from the command line."""
+
+    parser = create_parser()
+    args = parser.parse_args()
+
+    run_pipeline(
+        config_path=args.config,
+        limit=args.limit,
+        no_json=args.no_json,
+    )
 
 
 if __name__ == "__main__":

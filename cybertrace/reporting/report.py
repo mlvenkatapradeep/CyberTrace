@@ -1,5 +1,6 @@
 import json
 from collections import Counter
+from pathlib import Path
 
 from cybertrace.incident import SecurityIncident
 
@@ -162,5 +163,10 @@ def save_json_report(
 
     report = generate_json_report(incidents)
 
-    with open(output_path, "w", encoding="utf-8") as file:
-        file.write(report)
+    output_file = Path(output_path)
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+
+    output_file.write_text(
+        report,
+        encoding="utf-8",
+    )
