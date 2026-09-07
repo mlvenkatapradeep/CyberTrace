@@ -1,5 +1,8 @@
 from cybertrace.cli import create_parser
-from cybertrace.collector.journal import collect_ssh_events
+from cybertrace.collector.journal import (
+    JournalCollectionError,
+    collect_ssh_events,
+)
 from cybertrace.config.loader import load_config
 from cybertrace.detection.ssh import detect_ssh_bruteforce
 from cybertrace.incident.generator import generate_ssh_incidents
@@ -50,7 +53,13 @@ def run_pipeline(
     print()
 
     # 3. Collect raw SSH journal records
-    records = collect_ssh_events(limit)
+    try:
+        records = collect_ssh_events(limit)
+    except JournalCollectionError as exc:
+        print()
+        print("=== COLLECTION ERROR ===")
+        print(str(exc))
+        return []
 
     # 4. Parse raw records into AuthenticationEvent objects
     events = [

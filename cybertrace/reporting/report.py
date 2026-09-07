@@ -166,7 +166,5 @@ def save_json_report(
     output_file = Path(output_path)
     output_file.parent.mkdir(parents=True, exist_ok=True)
 
-    output_file.write_text(
-        report,
-        encoding="utf-8",
-    )
+    with output_file.open("w", encoding="utf-8") as file:
+        file.write(report)
