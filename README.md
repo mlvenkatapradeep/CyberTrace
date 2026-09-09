@@ -1,3 +1,5 @@
+[![CyberTrace Tests](https://github.com/mlvenkatapradeep/CyberTrace/actions/workflows/tests.yml/badge.svg)](https://github.com/mlvenkatapradeep/CyberTrace/actions/workflows/tests.yml)
+
 # CyberTrace
 
 **CyberTrace** is a lightweight Python-based SSH security monitoring and incident detection tool for Linux systems.
